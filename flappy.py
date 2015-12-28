@@ -10,7 +10,6 @@ from pybrain.structure import FeedForwardNetwork
 from pybrain.structure import LinearLayer, SigmoidLayer
 from pybrain.structure import FullConnection
 from pybrain.datasets            import ClassificationDataSet
-from pybrain.utilities           import percentError
 from pybrain.tools.shortcuts     import buildNetwork
 from pybrain.supervised.trainers import BackpropTrainer
 from pybrain.structure.modules   import SoftmaxLayer
@@ -20,6 +19,7 @@ old_fitness = 0
 fitness = 0
 score = 0
 disx = 0
+first_time = True
 
 num_nn_parameters = 3
 
@@ -223,17 +223,86 @@ def flap(playery, playerFlapAcc):
 
         return playerVelY, playerFlapped
 
-def mutate(n, in_to_hidden, hidden_to_out, num_nn_parameters):
-    selector = random.uniform(0,num_nn_parameters)
+def print_all_weights():
+    global in_to_hidden
+    global hidden_to_hidden2
+    global hidden_to_out
+    global num_nn_parameters
+    global num_nn_parameters
 
-    layer_select = random.uniform(0,1)
+    print '' 
+    print ''
+    print in_to_hidden.params
+    print hidden_to_hidden2.params
+    print hidden_to_out.params
+    print ''
+    print ''
 
+def mutate(n):
+    global in_to_hidden
+    global hidden_to_hidden2
+    global hidden_to_out
+
+
+    
+    
+    layer_select = random.uniform(0,2)
+
+    print 'Changed:'
     if layer_select == 0:
-        in_to_hidden.params[selector] = in_to_hidden.params[selector] + random.uniform(-2,2)
+        selector = int(random.uniform(0,5))
+        print in_to_hidden.params[selector]
+        in_to_hidden.params[selector] = in_to_hidden.params[selector] + random.uniform(-5,5)
+        print in_to_hidden.params[selector]
+    elif layer_select == 1:
+        selector = int(random.uniform(0,8))
+        print hidden_to_hidden.params[selector]
+        hidden_to_hidden2.params[selector] = hidden_to_hidden2.params[selector] + random.uniform(-5,5)
+        print hidden_to_hidden.params[selector]
     else:
-        hidden_to_.out.params[selector] = hidden_to_out.params[selector] + random.uniform(-2,2)
+        selector = int(random.uniform(0,3))
+        print hidden_to_out.params[selector]
+        hidden_to_out.params[selector] = hidden_to_out.params[selector] + random.uniform(-5,5)
+        print hidden_to_out.params[selector]
     return n
 
+def predict_action(rangex, error,  playerVelY, playerFlapped, i):
+    if i % 10 == 0:
+        pred = n.activate([rangex, error]).argmax()
+        if pred == 1:
+            playerVelY, playerFlapped = flap(playery, playerFlapAcc)
+    return playerVelY, playerFlapped
+
+def initalize_nn():
+    global in_to_hidden
+    global hidden_to_hidden2
+    global hidden_to_out
+    
+    # Old code (regression)        
+    n = FeedForwardNetwork()
+    # n = buildNetwork( 2, 3, data.outdim, outclass=SoftmaxLayer )
+
+    inLayer = LinearLayer(2)
+    hiddenLayer = SigmoidLayer(3)
+    hiddenLayer2 = SigmoidLayer(3)
+    outLayer = LinearLayer(1)
+
+    n.addInputModule(inLayer)
+    n.addModule(hiddenLayer)
+    n.addModule(hiddenLayer2)
+    n.addOutputModule(outLayer)
+        
+        
+    in_to_hidden = FullConnection(inLayer, hiddenLayer)
+    hidden_to_hidden2 = FullConnection(hiddenLayer, hiddenLayer2)
+    hidden_to_out = FullConnection(hiddenLayer2, outLayer)
+
+    n.addConnection(in_to_hidden)
+    n.addConnection(hidden_to_hidden2)
+    n.addConnection(hidden_to_out)
+        
+    n.sortModules()
+    return n
 
 ############## determine best neural network parameter canidate ##############
 def fitness_fun(score, x_distance, error):
@@ -246,19 +315,23 @@ def fitness_fun(score, x_distance, error):
 ##############################################################################
 
 def mainGame(movementInfo):
-    i = 0
     global fitness
     global old_fitness
     global num_nn_parameters
     global score
     global disx
-
+    global first_time
+    global n
+    global old_n
+    global in_to_hidden
+    global hidden_to_hidden2
+    global hidden_to_out
 
     
     
     print fitness
     
-    score = playerIndex = loopIter = 0
+    score = playerIndex = loopIter = i = 0
     playerIndexGen = movementInfo['playerIndexGen']
     playerx, playery = int(SCREENWIDTH * 0.2), movementInfo['playery']
 
@@ -292,48 +365,11 @@ def mainGame(movementInfo):
     playerFlapped = False # True when player flaps
 
     
-
-    ### Initalizing the neural network
-
     
-
-    if i == 0:
-
-        '''
-        data = ClassificationDataSet(2, 1, nb_classes = 2)
-        
-        n = buildNetwork( data.indim, 5, data.outdim, outclass=SoftmaxLayer )
-        trainer = BackpropTrainer( n, dataset=data, momentum=0.1, verbose=True, weightdecay=0.01)
-
-        data._convertToOneOfMany()
-        '''
-
-        # Old code (regression)        
-        n = FeedForwardNetwork()
-        # n = buildNetwork( 2, 3, data.outdim, outclass=SoftmaxLayer )
-
-        inLayer = LinearLayer(2)
-        hiddenLayer = SigmoidLayer(3)
-        hiddenLayer2 = SigmoidLayer(3)
-        outLayer = LinearLayer(1)
-
-        n.addInputModule(inLayer)
-        n.addModule(hiddenLayer)
-        n.addModule(hiddenLayer2)
-        n.addOutputModule(outLayer)
-        
-        
-        in_to_hidden = FullConnection(inLayer, hiddenLayer)
-        hidden_to_hidden2 = FullConnection(hiddenLayer, hiddenLayer2)
-        hidden_to_out = FullConnection(hiddenLayer2, outLayer)
-
-        n.addConnection(in_to_hidden)
-        n.addConnection(hidden_to_hidden2)
-        n.addConnection(hidden_to_out)
-        
-        n.sortModules()
-
-
+    if first_time:
+        ### Initalizing the neural network        
+        n = initalize_nn()
+        ds = ClassificationDataSet(2, nb_classes=2)
         z = 0
         for val in in_to_hidden.params:
 
@@ -344,15 +380,18 @@ def mainGame(movementInfo):
 
         old_nn = n
 
-    elif i!=0:
+    else:
         # create new nn (but with old_nn saved)
-        n = mutate(old_n, in_to_hidden, hidden_to_out, num_nn_parameters)
+        n = mutate(old_n)
 
         disx = 0
         score = 0
 
-        
-        
+    first_time = False
+    
+    # Print weights
+    print_all_weights()
+
         
         
     ####    
@@ -444,13 +483,16 @@ def mainGame(movementInfo):
 
             # If it turns out the old nn was better
             if old_fitness > fitness:
-
+                print 'Better fitness discovered'
                 # prevents the old but good nn from being overwritten
-                n = old_nn
+                n = old_n
                 fitness = old_fitness
 
             # store the good nn as the old_nn
-            old_nn = n
+            
+
+            old_n = n
+            
             
             old_fitness = fitness
 
@@ -545,15 +587,11 @@ def mainGame(movementInfo):
         FPSCLOCK.tick(FPS)
 
         
+        # Make prediction
+        playerVelY, playerFlapped = predict_action(rangex, error,  playerVelY, playerFlapped, i)
 
-        ########### Predicting output from neural network ##########
-        if i % 10 == 0:
-            pred = n.activate([rangex, error])
 
-            if pred[0] > 0:
-                playerVelY, playerFlapped = flap(playery, playerFlapAcc)
         
-        ############################################################
 
 def showGameOverScreen(crashInfo):
 
